@@ -1,5 +1,6 @@
-"""Test set for voc classes.
+"""Test set for tfrecord writer and reader.
 """
+import os
 import unittest
 import xml.etree.ElementTree as ET
 
@@ -11,6 +12,7 @@ import tensorflow as tf
 import project_root
 
 from src.data.voc import get_file_path, parse_label_files
+from src.data.tfrecord import write_tfrecord, read_tfrecord
 
 # Constants.
 IMAGE_ROOT = 'JPEGImages'
@@ -106,36 +108,58 @@ class Test(unittest.TestCase):
     def setup(self, tmpdir):
         self.tmpdir = tmpdir
 
-    def test_voc_get_file_path(self):
-        """Test it can get file paths from cityscapes like data structure.
+    def test_write_read_tfrecord(self):
+        """Test it can write and read the tfrecord file correctly.
         """
+        # Constants.
+        DATA_CATEGORY = ['train', 'val']
+        GT_X = np.array([[10, 90], [11, 88], [13, 87]])
+        GT_Y = np.array([[11, 88], [13, 87], [14, 85]])
+        GT_W = np.array([[20, 20], [21, 21], [22, 22]])
+        GT_H = np.array([[21, 21], [22, 22], [23, 23]])
+        GT_ID = np.array([9, 7])
+
+        # Make a dummy tfrecord file.
+        # XXX use more simple structure.
         input_dir, gt_data_list = _create_sample_voc_structure(self.tmpdir)
         output_dir = input_dir
+
+        # Convert from py.path.local to str.
         data_list = get_file_path(input_dir, TRAIN_FILENAMES, VAL_FILENAMES)
-        for cat1, cat2 in zip(data_list.values(), gt_data_list.values()):
-            for list1, list2 in zip(cat1.values(), cat2.values()):
-                # Do not care about orders.
-                self.assertEquals(set(list1), set(list2))
+        for v in data_list.values():
+            v['labels'] = parse_label_files(v['label_list'])
 
-    def test_parse_label_files(self):
-        """Test it can properly parse the voc xml label format.
-        """
-        # Ground truths.
-        train_gt = [
-            {'x': [10, 90], 'y': [11, 88], 'w': [20, 20], 'h': [21, 21], 'id': [9, 7]},
-            {'x': [11, 88], 'y': [13, 87], 'w': [21, 21], 'h': [22, 22], 'id': [9, 7]},
-            {'x': [13, 87], 'y': [14, 85], 'w': [22, 22], 'h': [23, 23], 'id': [9, 7]}
-        ]  # yapf: disable
-        val_gt = [
-            {'x': [10, 90], 'y': [11, 88], 'w': [20, 20], 'h': [21, 21], 'id': [9, 7]},
-            {'x': [11, 88], 'y': [13, 87], 'w': [21, 21], 'h': [22, 22], 'id': [9, 7]}
-        ]  # yapf: disable
-        input_dir, gt_data_list = _create_sample_voc_structure(self.tmpdir)
-        output_dir = input_dir
-        data_list = get_file_path(input_dir, TRAIN_FILENAMES, VAL_FILENAMES)
+        write_tfrecord(data_list, output_dir)
 
-        train_labels = parse_label_files(data_list['train']['label_list'])
-        val_labels = parse_label_files(data_list['val']['label_list'])
-
-        self.assertEquals(train_gt, train_labels)
-        self.assertEquals(val_gt, val_labels)
+        # Read the created tfrecord file.
+        init_op = tf.group(tf.global_variables_initializer(),
+                        tf.local_variables_initializer())
+        for category in DATA_CATEGORY:
+            dataset = read_tfrecord(
+                os.path.join(output_dir, category + '_0000.tfrecord'))
+            next_element = dataset.make_one_shot_iterator().get_next()
+            with tf.Session() as sess:
+                # The op for initializing the variables.
+                sess.run(init_op)
+                i = 0
+                while True:
+                    try:
+                        sample = sess.run(next_element)
+                        gt_image = np.array(
+                            Image.open(open(sample['filename'].decode(),
+                                            'rb')).convert('RGB'))
+                        np.testing.assert_array_equal(sample['image'], gt_image)
+                        self.assertEquals(sample['height'], IMAGE_HEIGHT)
+                        self.assertEquals(sample['width'], IMAGE_WIDTH)
+                        np.testing.assert_array_equal(sample['x'], GT_X[i])
+                        np.testing.assert_array_equal(sample['y'], GT_Y[i])
+                        np.testing.assert_array_equal(sample['w'], GT_W[i])
+                        np.testing.assert_array_equal(sample['h'], GT_H[i])
+                        np.testing.assert_array_equal(sample['id'], GT_ID)
+                        i += 1
+                    except tf.errors.OutOfRangeError:
+                        if category == 'train':
+                            assert i == 3
+                        else:
+                            assert i == 2
+                        break
