@@ -156,10 +156,11 @@ def parse_label_files(label_list):
         root = tree.getroot()
 
         for member in root.findall('object'):
-            xmin = int(member[4][0].text)
-            ymin = int(member[4][1].text)
-            xmax = int(member[4][2].text)
-            ymax = int(member[4][3].text)
+            bbox = member.find('bndbox')
+            xmin = int(bbox[0].text)
+            ymin = int(bbox[1].text)
+            xmax = int(bbox[2].text)
+            ymax = int(bbox[3].text)
 
             boxes_and_classes['x'].append(int((xmax + xmin) / 2))
             boxes_and_classes['y'].append(int((ymax + ymin) / 2))
