@@ -18,7 +18,7 @@ class Common:
         self.var_list = OrderedDict()
 
     @staticmethod
-    def _restore_model_variables(sess, ckpt_path , model_name):
+    def _restore_model_variables(sess, ckpt_path, model_name):
         """Get a list of model variables of @p model_name
         and restore its weights from a checkpoint.
         Parameters
@@ -33,8 +33,7 @@ class Common:
         # Make the dictionary to correspond variables.
         var_list = {}
         var_model = tf.get_collection(
-            key=tf.GraphKeys.TRAINABLE_VARIABLES,
-            scope='model')
+            key=tf.GraphKeys.TRAINABLE_VARIABLES, scope='model')
         for var in var_model:
             if model_name in var.name:
                 name = var.name[:-2]
@@ -191,9 +190,9 @@ class Common:
 
         return resize_bilinear
 
-    def _make_space_to_depth(self, name):
+    def _make_space_to_depth(self, size, name):
 
-        def space_to_depth(in_features, size, name):
+        def space_to_depth(in_features):
             with tf.variable_scope(name):
                 s2d = tf.space_to_depth(in_features, size)
             self.var_list[name] = tf.shape(s2d)

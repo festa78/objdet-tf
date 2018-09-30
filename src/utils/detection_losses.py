@@ -7,17 +7,17 @@ import tensorflow as tf
 
 def _parse_yolo_prediction_and_target(prediction, target):
     """Parse YOLO detector's prediction to
-    regression, objectiveness, and class logits.
+    regression, objectness, and class logits.
     """
     regression_prediction = prediction[..., :4]
-    objectiveness_prediction = prediction[..., 4]
+    objectness_prediction = prediction[..., 4]
     class_prediction = prediction[..., 5:]
     regression_target = target[..., :4]
-    objectiveness_target = target[..., 4]
+    objectness_target = target[..., 4]
     class_target = target[..., 5]
 
-    # Foreground has objectiveness = 1, otherwise background.
-    foreground = tf.cast(objectiveness_target, tf.bool)
+    # Foreground has objectness = 1, otherwise background.
+    foreground = tf.cast(objectness_target, tf.bool)
     background = tf.logical_not(foreground)
 
     # Only cares foreground for regression and classification.
@@ -36,46 +36,46 @@ def _parse_yolo_prediction_and_target(prediction, target):
             tf.cast(foreground_class_target, tf.int32), depth=num_classes),
         shape=(-1, num_classes))
 
-    # Separate to objectiveness and nonobjectiveness
+    # Separate to objectness and nonobjectness
     # to weight losses.
-    objectiveness_sigmoid_prediction = tf.nn.sigmoid(objectiveness_prediction)
-    objectiveness_sigmoid_prediction = tf.clip_by_value(
-        objectiveness_sigmoid_prediction,
+    objectness_sigmoid_prediction = tf.nn.sigmoid(objectness_prediction)
+    objectness_sigmoid_prediction = tf.clip_by_value(
+        objectness_sigmoid_prediction,
         np.finfo(np.float32).eps, 1. - np.finfo(np.float32).eps)
-    nonobjectiveness_sigmoid_prediction = 1. - objectiveness_sigmoid_prediction
+    nonobjectness_sigmoid_prediction = 1. - objectness_sigmoid_prediction
     # Convert to logits to use tf loss function.
-    nonobjectiveness_prediction = -tf.log(
-        (1. - nonobjectiveness_sigmoid_prediction) /
-        nonobjectiveness_sigmoid_prediction)
+    nonobjectness_prediction = -tf.log(
+        (1. - nonobjectness_sigmoid_prediction) /
+        nonobjectness_sigmoid_prediction)
 
-    objectiveness_stack_prediction = tf.stack(
-        [nonobjectiveness_prediction, objectiveness_prediction], axis=-1)
-    objectiveness_prediction = tf.reshape(
-        tf.boolean_mask(objectiveness_stack_prediction, foreground),
+    objectness_stack_prediction = tf.stack(
+        [nonobjectness_prediction, objectness_prediction], axis=-1)
+    objectness_prediction = tf.reshape(
+        tf.boolean_mask(objectness_stack_prediction, foreground),
         shape=(-1, 2))
-    nonobjectiveness_prediction = tf.reshape(
-        tf.boolean_mask(objectiveness_stack_prediction, background),
+    nonobjectness_prediction = tf.reshape(
+        tf.boolean_mask(objectness_stack_prediction, background),
         shape=(-1, 2))
 
-    nonobjectiveness_target = tf.boolean_mask(objectiveness_target, background)
-    objectiveness_target = tf.boolean_mask(objectiveness_target, foreground)
-    objectiveness_onehot_target = tf.reshape(
-        tf.one_hot(tf.cast(objectiveness_target, tf.int32), depth=2),
+    nonobjectness_target = tf.boolean_mask(objectness_target, background)
+    objectness_target = tf.boolean_mask(objectness_target, foreground)
+    objectness_onehot_target = tf.reshape(
+        tf.one_hot(tf.cast(objectness_target, tf.int32), depth=2),
         shape=(-1, 2))
-    nonobjectiveness_onehot_target = tf.reshape(
-        tf.one_hot(tf.cast(nonobjectiveness_target, tf.int32), depth=2),
+    nonobjectness_onehot_target = tf.reshape(
+        tf.one_hot(tf.cast(nonobjectness_target, tf.int32), depth=2),
         shape=(-1, 2))
 
     parsed_prediction = {
         'foreground_regression': foreground_regression_prediction,
-        'objectiveness': objectiveness_prediction,
-        'nonobjectiveness': nonobjectiveness_prediction,
+        'objectness': objectness_prediction,
+        'nonobjectness': nonobjectness_prediction,
         'foreground_class': foreground_class_prediction
     }
     parsed_target = {
         'foreground_regression': foreground_regression_target,
-        'objectiveness': objectiveness_onehot_target,
-        'nonobjectiveness': nonobjectiveness_onehot_target,
+        'objectness': objectness_onehot_target,
+        'nonobjectness': nonobjectness_onehot_target,
         'foreground_class': foreground_class_onehot_target
     }
     return parsed_prediction, parsed_target, foreground, background
@@ -84,7 +84,7 @@ def _parse_yolo_prediction_and_target(prediction, target):
 def yolo_detection_loss(prediction,
                         target,
                         weight_regression=5.,
-                        weight_nonobjectiveness=.5,
+                        weight_nonobjectness=.5,
                         return_all_losses=False):
     """Loss for YOLO detector.
 
@@ -99,14 +99,14 @@ def yolo_detection_loss(prediction,
         Ground truth for YOLO detector.
         In the last dimension, the first 4 elements are the ground truth
         regresssion target (tx, ty, tw, th), the 5th element represents
-        ground truth objectiveness, and the last element represents the ground truth
+        ground truth objectness, and the last element represents the ground truth
         class id.
 
     weight_regression: float, default 5.
         Weight parameter for regresssion loss.
 
-    weight_nonobjectiveness: float, default .5
-        Weight parameter for non-objectiveness loss.
+    weight_nonobjectness: float, default .5
+        Weight parameter for non-objectness loss.
 
     return_all_losses: bool, default False
         If True, return loss for each component in addition to a total loss.
@@ -119,11 +119,11 @@ def yolo_detection_loss(prediction,
     regression_loss: tf.float
         Loss for regression part.
 
-    objectiveness_loss: tf.float
-        Loss for objectiveness part.
+    objectness_loss: tf.float
+        Loss for objectness part.
 
-    nonobjectiveness_loss: tf.float
-        Loss for non-objectiveness part.
+    nonobjectness_loss: tf.float
+        Loss for non-objectness part.
 
     classification_loss: tf.float
         Loss for classification part.
@@ -134,21 +134,21 @@ def yolo_detection_loss(prediction,
     regression_loss = tf.losses.huber_loss(
         parsed_target['foreground_regression'],
         parsed_prediction['foreground_regression'])
-    objectiveness_loss = tf.losses.softmax_cross_entropy(
-        parsed_target['objectiveness'], parsed_prediction['objectiveness'])
-    nonobjectiveness_loss = tf.losses.softmax_cross_entropy(
-        parsed_target['nonobjectiveness'],
-        parsed_prediction['nonobjectiveness'])
+    objectness_loss = tf.losses.softmax_cross_entropy(
+        parsed_target['objectness'], parsed_prediction['objectness'])
+    nonobjectness_loss = tf.losses.softmax_cross_entropy(
+        parsed_target['nonobjectness'],
+        parsed_prediction['nonobjectness'])
     classification_loss = tf.losses.softmax_cross_entropy(
         parsed_target['foreground_class'],
         parsed_prediction['foreground_class'])
 
     loss = weight_regression * regression_loss + \
-           objectiveness_loss + \
-           weight_nonobjectiveness * nonobjectiveness_loss + \
+           objectness_loss + \
+           weight_nonobjectness * nonobjectness_loss + \
            classification_loss
 
     if return_all_losses:
-        return loss, regression_loss, objectiveness_loss, \
-            nonobjectiveness_loss, classification_loss
+        return loss, regression_loss, objectness_loss, \
+            nonobjectness_loss, classification_loss
     return loss
