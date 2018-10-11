@@ -121,14 +121,10 @@ class Test(unittest.TestCase):
         """Test it can properly parse the voc xml label format.
         """
         # Ground truths.
-        train_gt = [
-            {'x': [10, 90], 'y': [11, 88], 'w': [20, 20], 'h': [21, 21], 'id': [9, 7]},
-            {'x': [11, 88], 'y': [13, 87], 'w': [21, 21], 'h': [22, 22], 'id': [9, 7]},
-            {'x': [13, 87], 'y': [14, 85], 'w': [22, 22], 'h': [23, 23], 'id': [9, 7]}
-        ]  # yapf: disable
-        val_gt = [
-            {'x': [10, 90], 'y': [11, 88], 'w': [20, 20], 'h': [21, 21], 'id': [9, 7]},
-            {'x': [11, 88], 'y': [13, 87], 'w': [21, 21], 'h': [22, 22], 'id': [9, 7]}
+        GT_LABEL = [
+            {'l': [0, 80], 't': [1, 78], 'r': [20, 100], 'b': [22, 99], 'id': [9, 7]},
+            {'l': [1, 78], 't': [2, 76], 'r': [22, 99], 'b': [24, 98], 'id': [9, 7]},
+            {'l': [2, 76], 't': [3, 74], 'r': [24, 98], 'b': [26, 97], 'id': [9, 7]}
         ]  # yapf: disable
         input_dir, gt_data_list = _create_sample_voc_structure(self.tmpdir)
         output_dir = input_dir
@@ -137,5 +133,5 @@ class Test(unittest.TestCase):
         train_labels = parse_label_files(data_list['train']['label_list'])
         val_labels = parse_label_files(data_list['val']['label_list'])
 
-        self.assertEquals(train_gt, train_labels)
-        self.assertEquals(val_gt, val_labels)
+        self.assertEquals(GT_LABEL, train_labels)
+        self.assertEquals(GT_LABEL[:-1], val_labels)

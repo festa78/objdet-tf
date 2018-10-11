@@ -113,11 +113,9 @@ class Test(unittest.TestCase):
         """
         # Constants.
         DATA_CATEGORY = ['train', 'val']
-        GT_X = np.array([[10, 90], [11, 88], [13, 87]])
-        GT_Y = np.array([[11, 88], [13, 87], [14, 85]])
-        GT_W = np.array([[20, 20], [21, 21], [22, 22]])
-        GT_H = np.array([[21, 21], [22, 22], [23, 23]])
-        GT_ID = np.array([9, 7])
+        GT_LABEL = np.array([[[0, 1, 20, 22, 9], [80, 78, 100, 99, 7]],
+                              [[1, 2, 22, 24, 9], [78, 76, 99, 98, 7]],
+                              [[2, 3 ,24, 26, 9], [76, 74, 98, 97, 7]]])
 
         # Make a dummy tfrecord file.
         # XXX use more simple structure.
@@ -151,11 +149,7 @@ class Test(unittest.TestCase):
                         np.testing.assert_array_equal(sample['image'], gt_image)
                         self.assertEquals(sample['height'], IMAGE_HEIGHT)
                         self.assertEquals(sample['width'], IMAGE_WIDTH)
-                        np.testing.assert_array_equal(sample['x'], GT_X[i])
-                        np.testing.assert_array_equal(sample['y'], GT_Y[i])
-                        np.testing.assert_array_equal(sample['w'], GT_W[i])
-                        np.testing.assert_array_equal(sample['h'], GT_H[i])
-                        np.testing.assert_array_equal(sample['id'], GT_ID)
+                        np.testing.assert_array_equal(sample['label'], GT_LABEL[i])
                         i += 1
                     except tf.errors.OutOfRangeError:
                         if category == 'train':

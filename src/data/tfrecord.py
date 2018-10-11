@@ -59,18 +59,18 @@ def write_tfrecord(data_list, output_dir, batch_size_per_file=100):
                         'image_raw':
                         tf.train.Feature(
                             bytes_list=tf.train.BytesList(value=[image_raw])),
-                        'x':
+                        'l':
                         tf.train.Feature(
-                            float_list=tf.train.FloatList(value=labels['x'])),
-                        'y':
+                            int64_list=tf.train.Int64List(value=labels['l'])),
+                        't':
                         tf.train.Feature(
-                            float_list=tf.train.FloatList(value=labels['y'])),
-                        'w':
+                            int64_list=tf.train.Int64List(value=labels['t'])),
+                        'r':
                         tf.train.Feature(
-                            float_list=tf.train.FloatList(value=labels['w'])),
-                        'h':
+                            int64_list=tf.train.Int64List(value=labels['r'])),
+                        'b':
                         tf.train.Feature(
-                            float_list=tf.train.FloatList(value=labels['h'])),
+                            int64_list=tf.train.Int64List(value=labels['b'])),
                         'id':
                         tf.train.Feature(
                             int64_list=tf.train.Int64List(value=labels['id'])),
@@ -119,10 +119,10 @@ def _parse_bytes_sample(bytedata):
             'height': tf.FixedLenFeature([], tf.int64),
             'width': tf.FixedLenFeature([], tf.int64),
             'image_raw': tf.FixedLenFeature([], tf.string),
-            'x': tf.VarLenFeature(tf.float32),
-            'y': tf.VarLenFeature(tf.float32),
-            'w': tf.VarLenFeature(tf.float32),
-            'h': tf.VarLenFeature(tf.float32),
+            'l': tf.VarLenFeature(tf.int64),
+            't': tf.VarLenFeature(tf.int64),
+            'r': tf.VarLenFeature(tf.int64),
+            'b': tf.VarLenFeature(tf.int64),
             'id': tf.VarLenFeature(tf.int64),
             'filename': tf.FixedLenFeature([], tf.string)
         })
@@ -137,26 +137,23 @@ def _parse_bytes_sample(bytedata):
     image = tf.reshape(image, image_shape)
     image = tf.cast(image, tf.float32)
 
-    x = tf.sparse_tensor_to_dense(features['x'])
-    y = tf.sparse_tensor_to_dense(features['y'])
-    w = tf.sparse_tensor_to_dense(features['w'])
-    h = tf.sparse_tensor_to_dense(features['h'])
+    l = tf.sparse_tensor_to_dense(features['l'])
+    t = tf.sparse_tensor_to_dense(features['t'])
+    r = tf.sparse_tensor_to_dense(features['r'])
+    b = tf.sparse_tensor_to_dense(features['b'])
     class_id = tf.sparse_tensor_to_dense(features['id'])
-    x = tf.cast(x, tf.float64)
-    y = tf.cast(y, tf.float64)
-    w = tf.cast(w, tf.float64)
-    h = tf.cast(h, tf.float64)
+    l = tf.cast(l, tf.int32)
+    t = tf.cast(t, tf.int32)
+    r = tf.cast(r, tf.int32)
+    b = tf.cast(b, tf.int32)
     class_id = tf.cast(class_id, tf.int32)
+    label = tf.stack((l, t, r ,b, class_id), axis=1)
 
     sample = {
         'height': height_org,
         'width': width_org,
         'image': image,
-        'x': x,
-        'y': y,
-        'w': w,
-        'h': h,
-        'id': class_id,
+        'label': label,
         'filename': filename
     }
     return sample

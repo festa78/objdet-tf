@@ -124,7 +124,7 @@ def get_file_path(input_dir, train_list, val_list):
 
 def parse_label_files(label_list):
     """Parse label file and get box coordinate
-    (x, y, w, h) and its class id.
+    (l, t, r, b) and its class id.
 
     Parameters
     ----------
@@ -137,21 +137,21 @@ def parse_label_files(label_list):
         List of dictionary which represents box coordinates
         and their classes on each single image.
         The dictionary contains follows:
-        'x': list of float
-            Center position of box on horizontal axis.
-        'y': list of float
-            Center position of box on vertical axis.
-        'w': list of float
-            Width of box.
-        'h': list of float
-            Height of box.
+        'l': list of float
+            Left position of box on horizontal axis.
+        't': list of float
+            Top position of box on vertical axis.
+        'r': list of float
+            Right position of box on horizontal axis.
+        'b': list of float
+            Bottom position of box on vertical axis.
         'id': list of int
             Class id of object in a box.
     """
     labels = []
 
     for filename in label_list:
-        boxes_and_classes = {'x': [], 'y': [], 'w': [], 'h': [], 'id': []}
+        boxes_and_classes = {'l': [], 't': [], 'r': [], 'b': [], 'id': []}
         tree = ET.parse(filename)
         root = tree.getroot()
 
@@ -162,10 +162,10 @@ def parse_label_files(label_list):
             xmax = int(bbox[2].text)
             ymax = int(bbox[3].text)
 
-            boxes_and_classes['x'].append(int((xmax + xmin) / 2))
-            boxes_and_classes['y'].append(int((ymax + ymin) / 2))
-            boxes_and_classes['w'].append(xmax - xmin)
-            boxes_and_classes['h'].append(ymax - ymin)
+            boxes_and_classes['l'].append(xmin)
+            boxes_and_classes['t'].append(ymin)
+            boxes_and_classes['r'].append(xmax)
+            boxes_and_classes['b'].append(ymax)
             boxes_and_classes['id'].append(name2label[member[0].text].id)
 
         labels.append(boxes_and_classes)
