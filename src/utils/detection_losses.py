@@ -118,15 +118,19 @@ def yolo_detection_loss(prediction,
 
     regression_loss: tf.float
         Loss for regression part.
+        Returns if @p return_all_losses is True.
 
     objectness_loss: tf.float
         Loss for objectness part.
+        Returns if @p return_all_losses is True.
 
     nonobjectness_loss: tf.float
         Loss for non-objectness part.
+        Returns if @p return_all_losses is True.
 
     classification_loss: tf.float
         Loss for classification part.
+        Returns if @p return_all_losses is True.
     """
     parsed_prediction, parsed_target, foreground, background \
         = _parse_yolo_prediction_and_target(prediction, target)
