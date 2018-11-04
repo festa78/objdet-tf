@@ -8,7 +8,10 @@ import tensorflow as tf
 import tqdm
 
 
-def write_tfrecord(data_list, output_dir, batch_size_per_file=100):
+def write_tfrecord(data_list,
+                   output_dir,
+                   batch_size_per_file=100,
+                   normalize=False):
     """Write .tfrecord file for semantic segmentation.
 
     Parameters
@@ -20,7 +23,8 @@ def write_tfrecord(data_list, output_dir, batch_size_per_file=100):
         Each .tfrecord file contains this batch size at maximum.
     """
     for data_category in data_list.keys():
-        assert set(('image_list', 'labels')) <= set(data_list[data_category].keys())
+        assert set(
+            ('image_list', 'labels')) <= set(data_list[data_category].keys())
 
         file_basename = os.path.join(output_dir, data_category)
         for i, (image_path, labels) in tqdm.tqdm(
@@ -45,6 +49,13 @@ def write_tfrecord(data_list, output_dir, batch_size_per_file=100):
             height = image.shape[0]
             width = image.shape[1]
 
+            # Normalized locations.
+            if normalize:
+                labels['l'] = [float(l) / float(width) for l in labels['l']]
+                labels['t'] = [float(t) / float(height) for t in labels['t']]
+                labels['r'] = [float(r) / float(width) for r in labels['r']]
+                labels['b'] = [float(b) / float(height) for b in labels['b']]
+
             image_raw = image.tostring()
 
             example = tf.train.Example(
@@ -61,16 +72,16 @@ def write_tfrecord(data_list, output_dir, batch_size_per_file=100):
                             bytes_list=tf.train.BytesList(value=[image_raw])),
                         'l':
                         tf.train.Feature(
-                            int64_list=tf.train.Int64List(value=labels['l'])),
+                            float_list=tf.train.FloatList(value=labels['l'])),
                         't':
                         tf.train.Feature(
-                            int64_list=tf.train.Int64List(value=labels['t'])),
+                            float_list=tf.train.FloatList(value=labels['t'])),
                         'r':
                         tf.train.Feature(
-                            int64_list=tf.train.Int64List(value=labels['r'])),
+                            float_list=tf.train.FloatList(value=labels['r'])),
                         'b':
                         tf.train.Feature(
-                            int64_list=tf.train.Int64List(value=labels['b'])),
+                            float_list=tf.train.FloatList(value=labels['b'])),
                         'id':
                         tf.train.Feature(
                             int64_list=tf.train.Int64List(value=labels['id'])),
@@ -119,10 +130,10 @@ def _parse_bytes_sample(bytedata):
             'height': tf.FixedLenFeature([], tf.int64),
             'width': tf.FixedLenFeature([], tf.int64),
             'image_raw': tf.FixedLenFeature([], tf.string),
-            'l': tf.VarLenFeature(tf.int64),
-            't': tf.VarLenFeature(tf.int64),
-            'r': tf.VarLenFeature(tf.int64),
-            'b': tf.VarLenFeature(tf.int64),
+            'l': tf.VarLenFeature(tf.float32),
+            't': tf.VarLenFeature(tf.float32),
+            'r': tf.VarLenFeature(tf.float32),
+            'b': tf.VarLenFeature(tf.float32),
             'id': tf.VarLenFeature(tf.int64),
             'filename': tf.FixedLenFeature([], tf.string)
         })
@@ -142,12 +153,12 @@ def _parse_bytes_sample(bytedata):
     r = tf.sparse_tensor_to_dense(features['r'])
     b = tf.sparse_tensor_to_dense(features['b'])
     class_id = tf.sparse_tensor_to_dense(features['id'])
-    l = tf.cast(l, tf.int32)
-    t = tf.cast(t, tf.int32)
-    r = tf.cast(r, tf.int32)
-    b = tf.cast(b, tf.int32)
-    class_id = tf.cast(class_id, tf.int32)
-    label = tf.stack((l, t, r ,b, class_id), axis=1)
+    l = tf.cast(l, tf.float32)
+    t = tf.cast(t, tf.float32)
+    r = tf.cast(r, tf.float32)
+    b = tf.cast(b, tf.float32)
+    class_id = tf.cast(class_id, tf.float32)
+    label = tf.stack((l, t, r, b, class_id), axis=1)
 
     sample = {
         'height': height_org,

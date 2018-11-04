@@ -113,9 +113,10 @@ class Test(unittest.TestCase):
         """
         # Constants.
         DATA_CATEGORY = ['train', 'val']
-        GT_LABEL = np.array([[[0, 1, 20, 22, 9], [80, 78, 100, 99, 7]],
-                              [[1, 2, 22, 24, 9], [78, 76, 99, 98, 7]],
-                              [[2, 3 ,24, 26, 9], [76, 74, 98, 97, 7]]])
+        GT_LABEL = np.array(
+            [[[0., .01, .2, .22, 9.], [.8, .78, 1., .99, 7.]],
+             [[.01, .02, .22, .24, 9.], [.78, .76, .99, .98, 7.]],
+             [[.02, .03, .24, .26, 9.], [.76, .74, .98, .97, 7.]]])
 
         # Make a dummy tfrecord file.
         # XXX use more simple structure.
@@ -127,11 +128,11 @@ class Test(unittest.TestCase):
         for v in data_list.values():
             v['labels'] = parse_label_files(v['label_list'])
 
-        write_tfrecord(data_list, output_dir)
+        write_tfrecord(data_list, output_dir, normalize=True)
 
         # Read the created tfrecord file.
         init_op = tf.group(tf.global_variables_initializer(),
-                        tf.local_variables_initializer())
+                           tf.local_variables_initializer())
         for category in DATA_CATEGORY:
             dataset = read_tfrecord(
                 os.path.join(output_dir, category + '_0000.tfrecord'))
@@ -149,7 +150,8 @@ class Test(unittest.TestCase):
                         np.testing.assert_array_equal(sample['image'], gt_image)
                         self.assertEquals(sample['height'], IMAGE_HEIGHT)
                         self.assertEquals(sample['width'], IMAGE_WIDTH)
-                        np.testing.assert_array_equal(sample['label'], GT_LABEL[i])
+                        np.testing.assert_array_almost_equal(
+                            sample['label'], GT_LABEL[i])
                         i += 1
                     except tf.errors.OutOfRangeError:
                         if category == 'train':

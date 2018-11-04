@@ -40,7 +40,7 @@ class AnchorConverter:
 
         Parameters
         ----------
-        gt_bboxes: (num_boxes (l, t, r, b, class_id)) tf.Tensor
+        gt_bboxes: (num_boxes, (l, t, r, b, class_id)) tf.Tensor
             Ground truth bounding box locations and its class ids.
             The coordinate must be normalized to [0, 1.].
 
@@ -80,7 +80,8 @@ class AnchorConverter:
         assigned_idx = tf.argmax(iou, axis=1)
 
         # Compute regression target from prior anchors.
-        assigned_gt_regressions = self.encode_regression(gt_locations_xywh, assigned_idx)
+        assigned_gt_regressions = self.encode_regression(
+            gt_locations_xywh, assigned_idx)
         assigned_gt_classes = tf.gather(gt_classes, assigned_idx)
         assigned_gt_classes = tf.reshape(assigned_gt_classes, [-1, 1])
 
@@ -92,7 +93,8 @@ class AnchorConverter:
         assigned_gt_regressions *= tf.tile(objectness, [1, 4])
         assigned_gt_classes *= objectness
 
-        anchor_targets = tf.concat([assigned_gt_regressions, objectness, assigned_gt_classes], 1)
+        anchor_targets = tf.concat(
+            [assigned_gt_regressions, objectness, assigned_gt_classes], 1)
 
         anchor_targets = tf.reshape(
             anchor_targets,
@@ -153,17 +155,12 @@ def logit(x):
     return -tf.log(1. / x - 1.)
 
 
-def generate_anchor_priors(image_shape,
-                           grid_size=(16, 16),
-                           scale=(8, 16, 32),
-                           aspect_ratio=(.5, 1., 2.)):
+def generate_anchor_priors(
+        grid_size=(16, 16), scale=(8, 16, 32), aspect_ratio=(.5, 1., 2.)):
     """Generate anchor priors for images.
 
     Parameters
     ----------
-    image_shape: (height, width) int tuple
-        Shape of image on which anchors will be generated.
-
     grid_size: (height, width) int tuple
         Size of grid to separate image.
         Anchors will be generated on each grid center.
@@ -180,21 +177,20 @@ def generate_anchor_priors(image_shape,
     anchor_priors: (grid_height, grid_width, num_anchors, (x, y, w, h) box coordinate)
                    numpy float array
         Generated anchors for each grid cell.
+        (x, y, w, h) locations are normalized to [0, 1].
         @p num_anchors = len(scale) * len(aspect_ratio)
     """
     assert len(scale) > 0
     assert len(aspect_ratio) > 0
 
-    grid_height, grid_width = grid_size
-    image_height, image_width = image_shape
-    grid_height_pixel = image_height // grid_height
-    grid_width_pixel = image_width // grid_width
+    grid_rows, grid_cols = grid_size
+    grid_height = 1. / grid_rows
+    grid_width = 1. / grid_cols
     num_anchors = len(scale) * len(aspect_ratio)
 
     # Compute anchor centers for each grid cell.
-    one_row = np.arange(grid_width) * grid_width_pixel + grid_width_pixel // 2
-    one_col = np.arange(
-        grid_height) * grid_height_pixel + grid_height_pixel // 2
+    one_row = np.arange(grid_cols) * grid_width + grid_width / 2.
+    one_col = np.arange(grid_rows) * grid_height + grid_height / 2.
     anchor_priors = np.array(np.meshgrid(one_row, one_col), dtype=np.float)
     # Convert to the format compatible with the return value.
     anchor_priors = np.transpose(anchor_priors, (1, 2, 0))
@@ -205,9 +201,10 @@ def generate_anchor_priors(image_shape,
 
     # Generate anchor shapes relative to the grid cell centers.
     # Compute anchor shape by aspect_ratio using image area size.
-    grid_area = grid_width_pixel * grid_height_pixel
-    anchor_width = np.round(np.sqrt([grid_area / r for r in aspect_ratio]))
-    anchor_height = np.round(anchor_width * aspect_ratio)
+    grid_area = grid_width * grid_height
+    # anchor_width = np.round(np.sqrt([grid_area / r for r in aspect_ratio]))
+    anchor_width = np.sqrt([grid_area / r for r in aspect_ratio])
+    anchor_height = anchor_width * aspect_ratio
     # Scale shapes according to the shape parameters.
     anchor_width_scaled = np.repeat(scale, (len(aspect_ratio),)) * np.tile(
         anchor_width, (len(scale),))

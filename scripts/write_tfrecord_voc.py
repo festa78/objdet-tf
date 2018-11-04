@@ -45,4 +45,4 @@ if __name__ == '__main__':
     data_list = get_file_path(options.input_dir, train_list, val_list)
     for v in data_list.values():
         v['labels'] = parse_label_files(v['label_list'])
-    write_tfrecord(data_list, options.output_dir)
+    write_tfrecord(data_list, options.output_dir, normalize=True)

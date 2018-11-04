@@ -150,41 +150,35 @@ class Test(tf.test.TestCase):
     def test_generate_anchor_priors(self):
         """Check that it can generate expected anchors.
         """
-        IMAGE_SHAPE = (100, 100)
-
         # Regression.
-        gt = np.array([50., 50., 142., 284.])
+        gt = np.array([0.5, 0.5, 1.414214, 2.828427])
         grid_size = (1, 1)
         scale = (2,)
         aspect_ratio = (2.,)
-        anchor_priors = generate_anchor_priors(IMAGE_SHAPE, grid_size, scale,
-                                               aspect_ratio)
-        np.testing.assert_array_equal(np.squeeze(anchor_priors), gt)
+        anchor_priors = generate_anchor_priors(grid_size, scale, aspect_ratio)
+        np.testing.assert_array_almost_equal(np.squeeze(anchor_priors), gt)
 
         # Multiple scale and aspect ratio.
-        gt = np.array([
-            [50., 50., 282., 140.],
-            [50., 50., 142., 284.],
-            [50., 50., 564., 280.],
-            [50., 50., 284., 568.],
-            [50., 50., 1128., 560.],
-            [50., 50., 568., 1136.],
-        ])
+        gt = np.array([[0.5, 0.5, 2.82842712, 1.41421356],
+                       [0.5, 0.5, 1.41421356, 2.82842712],
+                       [0.5, 0.5, 5.65685425, 2.82842712],
+                       [0.5, 0.5, 2.82842712, 5.65685425],
+                       [0.5, 0.5, 11.3137085, 5.65685425],
+                       [0.5, 0.5, 5.65685425, 11.3137085]])
         scale = (2, 4, 8)
         aspect_ratio = (.5, 2.)
-        anchor_priors = generate_anchor_priors(IMAGE_SHAPE, grid_size, scale,
-                                               aspect_ratio)
-        np.testing.assert_array_equal(np.squeeze(anchor_priors), gt)
+        anchor_priors = generate_anchor_priors(grid_size, scale, aspect_ratio)
+        np.testing.assert_array_almost_equal(np.squeeze(anchor_priors), gt)
 
         # With grid.
-        gt = np.array([[[25., 25., 70., 140.], [75., 25., 70., 140.]],
+        gt = np.array([[[0.25, 0.25, .707107, 1.414214],
+                        [0.75, 0.25, .707107, 1.414214]],
                        [
-                           [25., 75., 70., 140.],
-                           [75., 75., 70., 140.],
+                           [0.25, 0.75, .707107, 1.414214],
+                           [0.75, 0.75, .707107, 1.414214],
                        ]])
         grid_size = (2, 2)
         scale = (2,)
         aspect_ratio = (2.,)
-        anchor_priors = generate_anchor_priors(IMAGE_SHAPE, grid_size, scale,
-                                               aspect_ratio)
-        np.testing.assert_array_equal(np.squeeze(anchor_priors), gt)
+        anchor_priors = generate_anchor_priors(grid_size, scale, aspect_ratio)
+        np.testing.assert_array_almost_equal(np.squeeze(anchor_priors), gt)
