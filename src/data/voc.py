@@ -75,6 +75,7 @@ labels = [
 name2label      = { label.name    : label for label in labels           }
 id2label        = { label.id      : label for label in labels           }
 trainId2label   = { label.trainId : label for label in reversed(labels) }
+id2trainId      = { label.id      : label.trainId for label in labels   }
 # yapf: enable
 
 

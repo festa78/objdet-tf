@@ -22,13 +22,12 @@ class Test(tf.test.TestCase):
             num_anchors = 1
             anchor_priors = np.array([15., 15., 30., 30.]).reshape(
                 [grid_size[0], grid_size[1], num_anchors, 4]) / 100.
-            dut = AnchorConverter(anchor_priors)
 
             # Single anchor and target.
             gt_bboxes = tf.constant([1., 1., 31., 31., 400], shape=[1, 5
                                                                    ]) / 100.
-            anchor_targets = dut.generate_anchor_targets(
-                gt_bboxes, iou_threshold=.5)
+            dut = AnchorConverter(anchor_priors, iou_threshold=.5)
+            anchor_targets = dut.generate_anchor_targets(gt_bboxes)
             self.assertAllClose(
                 anchor_targets,
                 tf.constant([0.02, 0.02, 0., 0., 1., 4.],
@@ -36,16 +35,15 @@ class Test(tf.test.TestCase):
 
             # Assigned as non-object with a higher iou_threshold.
             # Still it's an object.
-            anchor_targets = dut.generate_anchor_targets(
-                gt_bboxes, iou_threshold=.8769)
+            dut = AnchorConverter(anchor_priors, iou_threshold=.8769)
+            anchor_targets = dut.generate_anchor_targets(gt_bboxes)
             self.assertAllClose(
                 anchor_targets,
                 tf.constant([0.02, 0.02, 0., 0., 1., 4.],
                             shape=[grid_size[0], grid_size[1], num_anchors, 6]))
             # Not an object.
-            anchor_targets = dut.generate_anchor_targets(
-                gt_bboxes, iou_threshold=.8770)
-            print(anchor_targets.eval())
+            dut = AnchorConverter(anchor_priors, iou_threshold=.8770)
+            anchor_targets = dut.generate_anchor_targets(gt_bboxes)
             self.assertAllClose(
                 anchor_targets,
                 tf.constant([0., 0., 0., 0., 0., 0.],

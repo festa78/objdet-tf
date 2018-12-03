@@ -115,7 +115,7 @@ def read_tfrecord(file_path, cycle_length=5, num_parallel_calls=10):
 
     files = tf.data.Dataset.list_files(file_path)
     dataset = files.apply(
-        tf.contrib.data.parallel_interleave(
+        tf.data.experimental.parallel_interleave(
             tf.data.TFRecordDataset, cycle_length=cycle_length))
     dataset = dataset.map(_parse_bytes_sample, num_parallel_calls)
     return dataset
@@ -148,11 +148,11 @@ def _parse_bytes_sample(bytedata):
     image = tf.reshape(image, image_shape)
     image = tf.cast(image, tf.float32)
 
-    l = tf.sparse_tensor_to_dense(features['l'])
-    t = tf.sparse_tensor_to_dense(features['t'])
-    r = tf.sparse_tensor_to_dense(features['r'])
-    b = tf.sparse_tensor_to_dense(features['b'])
-    class_id = tf.sparse_tensor_to_dense(features['id'])
+    l = tf.sparse.to_dense(features['l'])
+    t = tf.sparse.to_dense(features['t'])
+    r = tf.sparse.to_dense(features['r'])
+    b = tf.sparse.to_dense(features['b'])
+    class_id = tf.sparse.to_dense(features['id'])
     l = tf.cast(l, tf.float32)
     t = tf.cast(t, tf.float32)
     r = tf.cast(r, tf.float32)

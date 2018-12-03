@@ -48,11 +48,12 @@ def _box_flip_left_right(box):
         The location (l, t, r, b) is normalized.
     """
     with tf.control_dependencies([
-            tf.assert_less_equal(tf.reduce_max(box), 1.),
-            tf.assert_greater_equal(tf.reduce_min(box), 0.)
+            tf.assert_less_equal(tf.reduce_max(box[:, :4]), 1.),
+            tf.assert_greater_equal(tf.reduce_min(box[:, :4]), 0.)
     ]):
         box_flipped = tf.stack(
-            [1. - box[:, 2], box[:, 1], 1. - box[:, 0], box[:, 3]], axis=1)
+            [1. - box[:, 2], box[:, 1], 1. - box[:, 0], box[:, 3], box[:, 4]],
+            axis=1)
     return box_flipped
 
 
@@ -82,15 +83,15 @@ def random_crop_image_and_label(image, label, crop_size):
     with tf.control_dependencies([
             tf.assert_greater(crop_size[0], 0),
             tf.assert_greater(crop_size[1], 0),
-            tf.assert_less(crop_size[0], image_width + 1),
-            tf.assert_less(crop_size[1], image_height + 1)
+            tf.assert_less(crop_size[0], image_height + 1),
+            tf.assert_less(crop_size[1], image_width + 1)
     ]):
-        l_max = image_width - crop_size[0] + 1
-        t_max = image_height - crop_size[1] + 1
+        t_max = image_height - crop_size[0] + 1
+        l_max = image_width - crop_size[1] + 1
 
-    l_crop = tf.random_uniform([1], maxval=l_max, dtype=tf.int32)[0]
     t_crop = tf.random_uniform([1], maxval=t_max, dtype=tf.int32)[0]
-    image_crop = image[l_crop:l_crop + crop_size[0], t_crop:t_crop +
+    l_crop = tf.random_uniform([1], maxval=l_max, dtype=tf.int32)[0]
+    image_crop = image[t_crop:t_crop + crop_size[0], l_crop:l_crop +
                        crop_size[1]]
 
     # Crop boxes in normalized coordinate.

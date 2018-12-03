@@ -36,7 +36,7 @@ class Test(tf.test.TestCase):
             image_gt[:, :5, :] = 1
             image_gt = tf.convert_to_tensor(image_gt, dtype=tf.int64)
             label_gt = np.array([
-                [.2, .3, .5, .8],
+                [.2, .3, .5, .8, 0],
             ])
             label_gt = tf.convert_to_tensor(label_gt, dtype=tf.float32)
             image_flip, label_flip = random_flip_left_right_image_and_label(
@@ -81,6 +81,5 @@ class Test(tf.test.TestCase):
             label = tf.convert_to_tensor(label, dtype=tf.float32)
             image_crop, label_crop = random_crop_image_and_label(
                 image, label, tf.constant([10, 10]))
-            print(tf.shape(label_crop).eval())
             self.assertAllEqual(tf.shape(image_crop)[:2], tf.constant([10, 10]))
             self.assertAllEqual(tf.shape(label_crop)[0], 0)

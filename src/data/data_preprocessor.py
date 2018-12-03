@@ -26,11 +26,13 @@ class DataPreprocessor:
 
     def __init__(self,
                  dataset,
+                 anchor_converter,
                  num_parallel_calls=10,
                  batch_size=32,
                  shuffle_buffer_size=100,
                  prefetch_buffer_size=1):
         self.dataset = dataset
+        self.anchor_converter = anchor_converter
         self.num_parallel_calls = num_parallel_calls
         self.batch_size = batch_size
         self.shuffle_buffer_size = shuffle_buffer_size
@@ -107,6 +109,9 @@ class DataPreprocessor:
         iterator: tf.data.Iterator
             The initializable iterator.
         """
+        # Generate anchor targets before batching to align the number of boxes.
+        self.process_label(self.anchor_converter.generate_anchor_targets)
+
         if self.shuffle_buffer_size not in (None, False):
             self.dataset = self.dataset.shuffle(self.shuffle_buffer_size)
         self.dataset = self.dataset.batch(self.batch_size)

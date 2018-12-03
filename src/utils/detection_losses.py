@@ -16,9 +16,13 @@ def _parse_yolo_prediction_and_target(prediction, target):
     objectness_target = target[..., 4]
     class_target = target[..., 5]
 
-    # Foreground has objectness = 1, otherwise background.
-    foreground = tf.cast(objectness_target, tf.bool)
-    background = tf.logical_not(foreground)
+    with tf.control_dependencies([
+            tf.assert_equal(
+                tf.shape(regression_prediction), tf.shape(regression_target))
+    ]):
+        # Foreground has objectness = 1, otherwise background.
+        foreground = tf.cast(objectness_target, tf.bool)
+        background = tf.logical_not(foreground)
 
     # Only cares foreground for regression and classification.
     foreground_regression_prediction \
@@ -44,18 +48,15 @@ def _parse_yolo_prediction_and_target(prediction, target):
         np.finfo(np.float32).eps, 1. - np.finfo(np.float32).eps)
     nonobjectness_sigmoid_prediction = 1. - objectness_sigmoid_prediction
     # Convert to logits to use tf loss function.
-    nonobjectness_prediction = -tf.log(
-        (1. - nonobjectness_sigmoid_prediction) /
-        nonobjectness_sigmoid_prediction)
+    nonobjectness_prediction = -tf.log((1. - nonobjectness_sigmoid_prediction) /
+                                       nonobjectness_sigmoid_prediction)
 
     objectness_stack_prediction = tf.stack(
         [nonobjectness_prediction, objectness_prediction], axis=-1)
     objectness_prediction = tf.reshape(
-        tf.boolean_mask(objectness_stack_prediction, foreground),
-        shape=(-1, 2))
+        tf.boolean_mask(objectness_stack_prediction, foreground), shape=(-1, 2))
     nonobjectness_prediction = tf.reshape(
-        tf.boolean_mask(objectness_stack_prediction, background),
-        shape=(-1, 2))
+        tf.boolean_mask(objectness_stack_prediction, background), shape=(-1, 2))
 
     nonobjectness_target = tf.boolean_mask(objectness_target, background)
     objectness_target = tf.boolean_mask(objectness_target, foreground)
@@ -141,8 +142,7 @@ def yolo_detection_loss(prediction,
     objectness_loss = tf.losses.softmax_cross_entropy(
         parsed_target['objectness'], parsed_prediction['objectness'])
     nonobjectness_loss = tf.losses.softmax_cross_entropy(
-        parsed_target['nonobjectness'],
-        parsed_prediction['nonobjectness'])
+        parsed_target['nonobjectness'], parsed_prediction['nonobjectness'])
     classification_loss = tf.losses.softmax_cross_entropy(
         parsed_target['foreground_class'],
         parsed_prediction['foreground_class'])

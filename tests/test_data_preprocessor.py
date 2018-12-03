@@ -7,11 +7,14 @@ import tensorflow as tf
 import project_root
 
 from src.data.data_preprocessor import DataPreprocessor
+from src.utils.bbox_handler import AnchorConverter, generate_anchor_priors
 
 
 def test_process_image():
     """Test DataPreprocessor.process_image.
     """
+    anchor_priors = generate_anchor_priors()
+    anchor_converter = AnchorConverter(anchor_priors)
     dataset = tf.data.Dataset.from_tensor_slices({
         'image':
         tf.constant(np.zeros((3, 3, 3))),
@@ -19,7 +22,7 @@ def test_process_image():
         tf.constant(np.zeros((3, 1)))
     })
 
-    dut = DataPreprocessor(dataset)
+    dut = DataPreprocessor(dataset, anchor_converter)
 
     # Lambda function with the external parameter @p a.
     dut.process_image(lambda image, a: image + a + 1, a=1)
@@ -38,6 +41,8 @@ def test_process_image():
 def test_process_label():
     """Test DataPreprocessor.process_label.
     """
+    anchor_priors = generate_anchor_priors()
+    anchor_converter = AnchorConverter(anchor_priors)
     dataset = tf.data.Dataset.from_tensor_slices({
         'image':
         tf.constant(np.zeros((3, 3, 3))),
@@ -45,7 +50,7 @@ def test_process_label():
         tf.constant(np.zeros((3, 1)))
     })
 
-    dut = DataPreprocessor(dataset)
+    dut = DataPreprocessor(dataset, anchor_converter)
 
     # Lambda function with the external parameter @p a.
     dut.process_label(lambda label, a: label + a + 1, a=1)
@@ -64,6 +69,8 @@ def test_process_label():
 def test_process_image_and_label():
     """Test DataPreprocessor.process_image_and_label.
     """
+    anchor_priors = generate_anchor_priors()
+    anchor_converter = AnchorConverter(anchor_priors)
     dataset = tf.data.Dataset.from_tensor_slices({
         'image':
         tf.constant(np.zeros((3, 3, 3))),
@@ -71,7 +78,7 @@ def test_process_image_and_label():
         tf.constant(np.zeros((3, 1)))
     })
 
-    dut = DataPreprocessor(dataset)
+    dut = DataPreprocessor(dataset, anchor_converter)
 
     # Lambda function with the external parameter @p a.
     dut.process_image_and_label(

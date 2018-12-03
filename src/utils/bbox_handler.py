@@ -1,6 +1,8 @@
 """Utility class for bounding box handling.
 """
 
+import sys
+
 import numpy as np
 import tensorflow as tf
 
@@ -19,9 +21,15 @@ class AnchorConverter:
         Anchor priors in (x, y, w ,h) coordinate.
         The coordinate must be normalized to [0., 1.].
         Will be converted to tf.Tensor internally.
+
+    iou_threshold: float, default: .5
+        When an anchor prior and a ground truth bounding boxes have
+        IoU larger than this value, the anchor prior is assigned as
+        foreground and (tx, ty, tw, th) translation between them
+        are computed as a regression target.
     """
 
-    def __init__(self, anchor_priors):
+    def __init__(self, anchor_priors, iou_threshold=.5):
         assert anchor_priors[..., :2].max() <= 1.
         assert anchor_priors[..., :2].min() >= 0.
 
@@ -33,22 +41,18 @@ class AnchorConverter:
         self.anchor_priors = tf.reshape(anchor_priors, [self.total_anchors, 4])
         self.anchor_priors = tf.cast(self.anchor_priors, tf.float32)
 
-    def generate_anchor_targets(self, gt_bboxes, iou_threshold=.5):
+        self.iou_threshold = iou_threshold
+
+    def generate_anchor_targets(self, label):
         """Given ground truth bounding boxes and anchor priors,
         compute IoU between them. If IoU is larger than @p iou_threshold,
         assign the corresponding anchor to object and regression.
 
         Parameters
         ----------
-        gt_bboxes: (num_boxes, (l, t, r, b, class_id)) tf.Tensor
+        label: (num_boxes, (l, t, r, b, class_id)) tf.Tensor
             Ground truth bounding box locations and its class ids.
             The coordinate must be normalized to [0, 1.].
-
-        iou_threshold: float, default: 5
-            When an anchor prior and a ground truth bounding boxes have
-            IoU larger than this value, the anchor prior is assigned as
-            foreground and (tx, ty, tw, th) translation between them
-            are computed as a regression target.
 
         Returns
         -------
@@ -61,7 +65,7 @@ class AnchorConverter:
             If there is no target assigned to an anchor, it will have all zeros
             for the 6 elements in the last dimension.
         """
-        gt_locations_ltrb, gt_classes = gt_bboxes[:, :4], gt_bboxes[:, 4]
+        gt_locations_ltrb, gt_classes = label[:, :4], label[:, 4]
 
         with tf.control_dependencies([
                 tf.assert_less_equal(tf.reduce_max(gt_locations_ltrb), 1.),
@@ -72,7 +76,7 @@ class AnchorConverter:
         # Assign ground truths to anchors which have IoU larger than
         # the threshold.
         iou = compute_iou(self.anchor_priors, gt_locations_xywh)
-        iou_masked = tf.cast(iou > iou_threshold, tf.float32)
+        iou_masked = tf.cast(iou > self.iou_threshold, tf.float32)
         iou *= iou_masked
 
         # Assign ground truth which has the largest IoU.
@@ -82,7 +86,8 @@ class AnchorConverter:
         # Compute regression target from prior anchors.
         assigned_gt_regressions = self.encode_regression(
             gt_locations_xywh, assigned_idx)
-        assigned_gt_classes = tf.gather(gt_classes, assigned_idx)
+        assigned_gt_classes = tf.gather(
+            tf.reshape(gt_classes, [-1, 1]), assigned_idx)
         assigned_gt_classes = tf.reshape(assigned_gt_classes, [-1, 1])
 
         # If there is no ground truth assigned to an anchor, it is
@@ -332,3 +337,35 @@ def xywh_to_ltrb(xywh):
          tf.assert_non_negative(b - t)]):
         ltrb = tf.concat([l, t, r, b], axis=1)
     return ltrb
+
+
+def convert_labelid(label, lookup_table):
+    """Convert a label of box using lookup_table.
+
+    Parameters
+    ----------
+    label: (num_boxes, (l, t, r, b, class id) or (x, y, w, b, class_id)) tensor
+        The box location with class id.
+
+    lookup_table: functional
+        The function which accepts int scalar class_id and output converted id.
+
+    Returns
+    -------
+    converted_label: (num_boxes, (l, t, r, b, class id) or (x, y, w, b, class_id)) tensor
+        The box location with converted class id.
+    """
+
+    converted_id = tf.py_func(
+        func=lambda x: np.array([lookup_table[int(r)] for r in np.nditer(x)], dtype=np.float32).reshape(x.shape),
+        inp=[
+            label[:, -1],
+        ],
+        Tout=tf.float32)
+
+    converted_label = tf.concat(
+        (label[:, :-1], tf.expand_dims(converted_id, 1)), axis=1)
+
+    # Restore shape as py_func loses shape information.
+    converted_label.set_shape(label.get_shape())
+    return converted_label
