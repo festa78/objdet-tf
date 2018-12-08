@@ -32,7 +32,8 @@ class Test(unittest.TestCase):
                     dummy_in = tf.placeholder(
                         tf.float32, (None, image_height, image_width, 3))
                     dummy_gt = tf.placeholder(
-                        tf.float32, (1, model.GRID_H, model.GRID_W, 1, 6))
+                        tf.float32,
+                        (1, model.GRID_H, model.GRID_W, NUM_ANCHORS, 6))
 
                 with tf.device("/gpu:0"):
                     dut = model(self.NUM_CLASSES, self.NUM_ANCHORS)
@@ -52,7 +53,8 @@ class Test(unittest.TestCase):
                 with tf.Session() as sess:
                     sess.run(tf.global_variables_initializer())
 
-                    target_np = np.zeros((1, model.GRID_H, model.GRID_W, 1, 6))
+                    target_np = np.zeros((1, model.GRID_H, model.GRID_W,
+                                          NUM_ANCHORS, 6))
                     target_np[0, 5, 5, 0, 4] = np.array([1.])
                     target_np[0, 5, 5, 0, 5:] = np.array([1.])
 
