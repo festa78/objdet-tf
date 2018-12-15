@@ -139,7 +139,6 @@ class AnchorConverter:
                                                   assigned_idx)
         assigned_gt_regressions_xy \
             = assigned_target_locations[:, :2] - self.anchor_priors[:, :2]
-        # Squash to [0., 1.]
         # TODO: Should use a top left point of grid instead?
         assigned_gt_regressions_xy = (assigned_gt_regressions_xy + 1.) / 2.
         assigned_gt_regressions_xy = logit(assigned_gt_regressions_xy)
@@ -150,8 +149,30 @@ class AnchorConverter:
 
         return assigned_gt_regressions
 
-    def decode_regression(self):
-        pass
+    def decode_regression(self, regressions_xywh):
+        """Decode regressions using anchor priors.
+
+        Parameters
+        ----------
+        regressions_xywh: (num_anchors, (tx, ty, tw, th) location) tf.Tensor
+            Predicted bounding box regressions from the anchor priors.
+            The element order must be aligned with @p anchor_priors.
+            It assumes normalized coordinate [0., 1.].
+
+        Returns
+        -------
+        decoded_locations_xywh: (num_anchors, (x ,y ,w, h) location) tf.Tensor
+            Decoded anchor locations in normalized coordinate [0., 1.].
+        """
+        decoded_locations_xy = tf.sigmoid(regressions_xywh[:, :2])
+        decoded_locations_xy = decoded_locations_xy * 2. - 1.
+        decoded_locations_xy += self.anchor_priors[:, :2]
+        decoded_locations_wh = tf.exp(
+            regressions_xywh[:, 2:]) * self.anchor_priors[:, 2:]
+        decoded_locations_xywh = tf.concat(
+            [decoded_locations_xy, decoded_locations_wh], axis=1)
+
+        return decoded_locations_xywh
 
 
 def logit(x):

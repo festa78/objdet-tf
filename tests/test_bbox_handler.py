@@ -49,8 +49,8 @@ class Test(tf.test.TestCase):
                 tf.constant([0., 0., 0., 0., 0., 0.],
                             shape=[grid_size[0], grid_size[1], num_anchors, 6]))
 
-    def test_encode_regression(self):
-        """Test it can encode regression targets.
+    def test_encode_decode_regression(self):
+        """Test it can encode and decode regression targets.
         """
         with self.test_session():
             grid_size = (1, 1)
@@ -67,6 +67,8 @@ class Test(tf.test.TestCase):
             self.assertAllClose(
                 assigned,
                 tf.constant([0.02, 0.02, 0., 0.], shape=[num_anchors, 4]))
+            decoded = dut.decode_regression(assigned)
+            self.assertAllClose(decoded, target_locations_xywh)
 
             # Multiple assigned indices.
             num_anchors = 2
@@ -84,6 +86,8 @@ class Test(tf.test.TestCase):
                 tf.constant(
                     [[0.02, 0.02, 0., 0.], [0., 0., -0.033902, -0.033902]],
                     shape=[num_anchors, 4]))
+            decoded = dut.decode_regression(assigned)
+            self.assertAllClose(decoded, target_locations_xywh)
 
     def test_compute_iou(self):
         """Test it can compute IoU properly.
