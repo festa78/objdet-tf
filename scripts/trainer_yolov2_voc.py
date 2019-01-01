@@ -190,8 +190,11 @@ if __name__ == '__main__':
         trainer = Trainer(
             model=model,
             num_classes=options['num_classes'],
+            train_num_batch=options['batch_size'],
+            val_num_batch=1,
             train_iterator=train_iterator,
             val_iterator=val_iterator,
+            anchor_converter=anchor_converter,
             loss_fn=yolo_detection_loss,
             optimizer=optimizer,
             global_step=global_step,

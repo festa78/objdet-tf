@@ -6,9 +6,13 @@ logging.basicConfig(level=logging.INFO)
 import os
 import time
 
+import cv2
+import numpy as np
 import tensorflow as tf
 
 import project_root
+
+from src.utils.bbox_handler import xywh_to_ltrb
 
 
 class Trainer:
@@ -22,37 +26,64 @@ class Trainer:
     model: object
         A semantic segmentation model object which
         has .__call__(input) method to get model output.
+
     num_classes: int
         The number of output classes of the model.
+
+    train_num_batch: int
+        The batch size of train inputs.
+
+    val_num_batch: int
+        The batch size of validation inputs.
+
     train_iterator: tf.Tensor
         The initializable iterator for training.
         .get_next() is used to create train batch operator.
+
     val_iterator: tf.Tensor
         The initializable iterator for validation.
         .get_next() is used to create validation batch operator.
+
+    anchor_converter: AnchorConverter class
+        The closs to encode/decode anchors.
+
     loss_fn: functional
         A functional which outputs loss value according to
         the same sized inputs tensors: predicted output
         tf.Tensor, ground truth output tf.Tensor,
         and weight tf.Tensor which weights losses
         on each pixel when conducting reduce mean operation.
+
     optimizer: tf.Train.Optimizer
         A optimizer class which optimizes parameters of
         the @p model with losses computed by @loss_fn.
+
     global_step: tf.Variable
         A global step value to use with optimizer and
         logging purpose.
+
     save_dir: str
         A path to the directory to save logs and models.
+
+    score_threshold: float, default: .2
+        Objectness score threshold to ignore boxes as non-object.
+
+    iou_threshold: float, default: .2
+        IoU threshold for non-max suppression.
+
     num_epochs: int, default: 200
         The number epochs to train.
+
     evaluate_epochs: int, default: 10
         Evaluate model by validation dataset and save the session
         every @p evaluate_epochs epochs.
+
     verbose_steps: int, default: 10
         Show metric every @p verbose_step.
+
     resume_path: str, default: None
         The path to resume session from.
+
     finetune_from: str, default: None
         If specified, resume only model weights from the architecture.
     """
@@ -60,12 +91,17 @@ class Trainer:
     def __init__(self,
                  model,
                  num_classes,
+                 train_num_batch,
+                 val_num_batch,
                  train_iterator,
                  val_iterator,
+                 anchor_converter,
                  loss_fn,
                  optimizer,
                  global_step,
                  save_dir,
+                 score_threshold=.2,
+                 iou_threshold=.5,
                  num_epochs=200,
                  evaluate_epochs=10,
                  verbose_steps=10,
@@ -75,14 +111,19 @@ class Trainer:
 
         self.model = model
         self.num_classes = num_classes
+        self.train_num_batch = train_num_batch
+        self.val_num_batch = val_num_batch
         self.train_iterator = train_iterator
         self.val_iterator = val_iterator
+        self.anchor_converter = anchor_converter
         self.train_batch = self.train_iterator.get_next()
         self.val_batch = self.val_iterator.get_next()
         self.loss_fn = loss_fn
         self.optimizer = optimizer
         self.global_step = global_step
         self.save_dir = save_dir
+        self.score_threshold = score_threshold
+        self.iou_threshold = iou_threshold
         self.num_epochs = num_epochs
         self.evaluate_epochs = evaluate_epochs
         self.verbose_steps = verbose_steps
@@ -107,15 +148,17 @@ class Trainer:
             self.train_mean_loss, \
             self.train_mean_loss_update_op, \
             self.train_metric_reset_op, \
-            self.train_step_summary_op = self.compute_metrics(
-                self.train_batch['image'], self.train_batch['label'], 'train')
+            self.train_step_summary_op, \
+            self.train_epoch_summary_op = self.compute_metrics(
+                self.train_batch['image'], self.train_batch['label'], self.train_num_batch, 'train')
 
         self.val_loss, \
             self.val_mean_loss, \
             self.val_mean_loss_update_op, \
             self.val_metric_reset_op, \
-            self.val_step_summary_op = self.compute_metrics(
-                self.val_batch['image'], self.val_batch['label'], 'val')
+            self.val_step_summary_op, \
+            self.val_epoch_summary_op = self.compute_metrics(
+                self.val_batch['image'], self.val_batch['label'], self.val_num_batch, 'val')
 
         self.train_op = self.optimizer.minimize(
             self.train_loss,
@@ -137,14 +180,14 @@ class Trainer:
         os.makedirs(self.log_dir)
         os.makedirs(self.ckpt_dir)
 
-    def compute_metrics(self, image, label, name):
+    def compute_metrics(self, images, labels, num_batch, name):
         """Compute necessary metics: loss, weights, IoU, and summaries.
 
         Parameters
         ----------
-        image: (N, H, W, C=3) tf.tensor
+        images: (N, H, W, C=3) tf.tensor
             Image batch used as an input.
-        label: (grid_height, grid_width, num_anchors, 6) tf.Tensor
+        labels: (N, grid_height, grid_width, num_anchors, 6) tf.Tensor
             Regression target for anchors.
             In the last dimension, the first 4 elements are the ground truth
             regresssion target (tx, ty, tw, th), the 5th element represents
@@ -152,6 +195,8 @@ class Trainer:
             class id.
             If there is no target assigned to an anchor, it will have all zeros
             for the 6 elements in the last dimension.
+        num_batch: int
+            The batch size of inputs.
         name: string
             Variable scope prefix for the metrics.
 
@@ -179,18 +224,36 @@ class Trainer:
             Operator to compute metrics for each epoch.
         """
         with tf.variable_scope('model', reuse=tf.AUTO_REUSE):
-            predictions = self.model(image)
-            regression_predictions, objectness, class_logits = predictions[
-                ..., :4], predictions[..., 4], predictions[..., 5:]
-            class_predictions = tf.argmax(class_logits, axis=-1)
+            predictions = self.model(images)
 
         # Metric computations should live in cpu.
         with tf.device('cpu:0'):
             with tf.variable_scope('{}_step_metrics'.format(name)) as scope:
-                loss = self.loss_fn(predictions, label)
+                loss = self.loss_fn(predictions, labels)
 
             with tf.variable_scope('{}_epoch_metrics'.format(name)) as scope:
                 mean_loss, mean_loss_update_op = tf.metrics.mean(loss)
+
+                regression_predictions_nms, \
+                    objectness_predictions_nms, \
+                    class_predictions_nms, \
+                    regression_labels_valid, \
+                    class_labels_valid = self._parse_outputs(
+                        predictions, labels, num_batch)
+
+                # TODO: support random indexing.
+                image_summary = tf.cast(images[0] * 255., tf.uint8)
+                regression_prediction_image = regression_predictions_nms[0]
+                objectness_prediction_image = objectness_predictions_nms[0]
+                class_prediction_image = class_predictions_nms[0]
+                regression_label_image = regression_labels_valid[0]
+                class_label_image = class_labels_valid[0]
+
+                image_summary = self._draw_boxes(
+                    image_summary, regression_prediction_image,
+                    objectness_prediction_image, class_prediction_image,
+                    regression_label_image, class_label_image)
+
                 var_list = tf.contrib.framework.get_variables(
                     scope, collection=tf.GraphKeys.LOCAL_VARIABLES)
                 metric_reset_op = tf.variables_initializer(var_list)
@@ -202,9 +265,150 @@ class Trainer:
             step_summaries.append(
                 tf.summary.scalar('{}_mean_loss'.format(name), mean_loss))
 
-            step_summary_op = tf.summary.merge(step_summaries)
+            epoch_summaries = []
+            epoch_summaries.append(
+                tf.summary.image('{}_visualization'.format(name),
+                                 image_summary))
 
-        return loss, mean_loss, mean_loss_update_op, metric_reset_op, step_summary_op
+            step_summary_op = tf.summary.merge(step_summaries)
+            epoch_summary_op = tf.summary.merge(epoch_summaries)
+
+        return loss, mean_loss, mean_loss_update_op, metric_reset_op, \
+            step_summary_op, epoch_summary_op
+
+    def _draw_boxes(self, image_summary, regression_prediction,
+                    objectness_prediction, class_prediction, regression_label,
+                    class_label):
+        """Draw boxes and classes of prediction and label.
+        Also show objectness for prediction.
+        """
+
+        def cv_draw(image, box_preds, box_gts):
+            image = np.squeeze(image)
+            height = image.shape[0]
+            width = image.shape[1]
+            box_preds = np.clip(box_preds, 0., 1.)
+            box_preds = np.stack(
+                (box_preds[:, 0] * width, box_preds[:, 1] * height,
+                 box_preds[:, 2] * width, box_preds[:, 3] * height), 1)
+            box_gts = np.stack((box_gts[:, 0] * width, box_gts[:, 1] * height,
+                                box_gts[:, 2] * width, box_gts[:, 3] * height),
+                               1)
+            box_preds = box_preds.astype(np.int)
+            box_gts = box_gts.astype(np.int)
+            for box in box_preds:
+                cv2.rectangle(image, (box[0], box[1]), (box[2], box[3]),
+                              (0, 255, 0), 2)
+            for box in box_gts:
+                cv2.rectangle(image, (box[0], box[1]), (box[2], box[3]),
+                              (0, 0, 0), 2)
+
+            image = np.reshape(image, (1, height, width, 3))
+            return image
+
+        regression_prediction = tf.reshape(regression_prediction, (-1, 4))
+        regression_label = tf.reshape(regression_label, (-1, 4))
+        image_summary = tf.py_func(
+            cv_draw, [image_summary, regression_prediction, regression_label],
+            tf.uint8)
+
+        return image_summary
+
+    def _parse_outputs(self, predictions, labels, num_batch):
+        """Parse model outputs and labels for evaluations.
+        """
+        regression_predictions = predictions[..., :4]
+        objectness_predictions = predictions[..., 4]
+        class_logits_predictions = predictions[..., 5:]
+        class_predictions = tf.argmax(class_logits_predictions, axis=-1)
+        regression_labels = labels[..., :4]
+        objectness_labels = labels[..., 4]
+        class_labels = labels[..., 5]
+
+        shape = tf.shape(objectness_predictions)
+        grid_h, grid_w, num_anchors = shape[1], shape[2], shape[3]
+        num_anchors_grid = grid_h * grid_w * num_anchors
+
+        regression_predictions = tf.reshape(regression_predictions,
+                                            [num_batch, num_anchors_grid, 4])
+        objectness_predictions = tf.reshape(objectness_predictions,
+                                            [num_batch, num_anchors_grid])
+        class_predictions = tf.reshape(class_predictions,
+                                       [num_batch, num_anchors_grid])
+
+        # Apply NMS on predictions per class per sample.
+        regression_predictions_nms = []
+        objectness_predictions_nms = []
+        class_predictions_nms = []
+        for regression_prediction, objectness_prediction, class_prediction in zip(
+                tf.unstack(regression_predictions, num=num_batch),
+                tf.unstack(objectness_predictions, num=num_batch),
+                tf.unstack(class_predictions, num=num_batch)):
+            # Decode regressions.
+            regression_prediction = self.anchor_converter.decode_regression(
+                regression_prediction)
+            regression_prediction = xywh_to_ltrb(regression_prediction)
+
+            selected_indices_predictions = []
+            for i in range(self.num_classes):
+                class_mask = tf.equal(class_prediction, i)
+
+                regression_predictions_class = tf.boolean_mask(
+                    regression_prediction, class_mask)
+                objectness_class = tf.boolean_mask(objectness_prediction,
+                                                   class_mask)
+
+                # Returns an empty tensor if inputs are empty.
+                selected_indices = tf.image.non_max_suppression(
+                    regression_predictions_class,
+                    objectness_class,
+                    num_anchors_grid,
+                    iou_threshold=self.iou_threshold,
+                    score_threshold=self.score_threshold),
+                selected_indices = tf.reshape(
+                    tf.gather(tf.where(class_mask), selected_indices), [-1])
+
+                selected_indices_predictions.append(selected_indices)
+
+            selected_indices_predictions = tf.concat(
+                selected_indices_predictions, axis=0)
+            regression_prediction_nms = tf.gather(regression_prediction,
+                                                  selected_indices_predictions)
+            objectness_prediction_nms = tf.gather(objectness_prediction,
+                                                  selected_indices_predictions)
+            class_prediction_nms = tf.gather(class_prediction,
+                                             selected_indices_predictions)
+            regression_predictions_nms.append(regression_prediction_nms)
+            objectness_predictions_nms.append(objectness_prediction_nms)
+            class_predictions_nms.append(class_prediction_nms)
+
+        regression_labels = tf.reshape(regression_labels,
+                                       [num_batch, num_anchors_grid, 4])
+        objectness_labels = tf.reshape(objectness_labels,
+                                       [num_batch, num_anchors_grid])
+        class_labels = tf.reshape(class_labels, [num_batch, num_anchors_grid])
+
+        # Extract only valid boxes which has a target assigned.
+        regression_labels_valid = []
+        class_labels_valid = []
+        for regression_label, objectness_label, class_label in zip(
+                tf.unstack(regression_labels, num=num_batch),
+                tf.unstack(objectness_labels, num=num_batch),
+                tf.unstack(class_labels, num=num_batch)):
+            # Decode regressions.
+            regression_label = self.anchor_converter.decode_regression(
+                regression_label)
+            regression_label = xywh_to_ltrb(regression_label)
+
+            valid_mask = tf.not_equal(objectness_label, 0)
+            regression_label = tf.boolean_mask(regression_label, valid_mask)
+            class_label = tf.boolean_mask(regression_label, valid_mask)
+
+            regression_labels_valid.append(regression_label)
+            class_labels_valid.append(class_label)
+
+        return regression_predictions_nms, objectness_predictions_nms, \
+            class_predictions_nms, regression_labels_valid, class_labels_valid
 
     def train(self, sess):
         """Execute train loop.
@@ -258,6 +462,10 @@ class Trainer:
                     ep, proc_time, train_mloss))
             summary_writer.add_summary(train_step_summary, ep)
 
+            sess.run(self.train_iterator.initializer)
+            train_epoch_summary = sess.run(self.train_epoch_summary_op)
+            summary_writer.add_summary(train_epoch_summary, ep)
+
             if (ep + 1) % self.evaluate_epochs == 0:
                 with tf.device('/cpu'):
                     save_path = '{:08d}.ckpt'.format(ep)
@@ -289,6 +497,12 @@ class Trainer:
 
         self.logger.info('Validation proc time: {:06f}'.format(proc_time))
         _, val_step_summary = out
+
         val_mloss = sess.run(self.val_mean_loss)
         self.logger.info('Validation mean loss: {:06f}'.format(val_mloss))
+
+        sess.run(self.val_iterator.initializer)
+        val_epoch_summary = sess.run(self.val_epoch_summary_op)
+
         summary_writer.add_summary(val_step_summary, epoch)
+        summary_writer.add_summary(val_epoch_summary, epoch)

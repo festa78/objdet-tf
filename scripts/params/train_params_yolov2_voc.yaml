@@ -45,8 +45,8 @@ random_hue: 0.2
 # Scale factor used to adjust saturation.
 random_saturation: 0.2
 # Parameters for tf.train.polynomial_decay.
-learning_rate: 0.2
-end_learning_rate: 0.002
+learning_rate: 0.002
+end_learning_rate: 0.0002
 power: 0.9
 # The number of training samples. Use to compute decay steps
 # for polynomial learning rate.
@@ -60,9 +60,9 @@ verbose_steps: 10
 # If you use vgg_16, download weights from here:
 # http://download.tensorflow.org/models/vgg_16_2016_08_28.tar.gz
 resume_path:
-# If specified, resume only model weights from the architecture.
-# If you use vgg_16 wegihts, set 'vgg_16'.
-finetune_from: 'vgg_16'
+# If specified, resume only model weights from the specified architecture.
+# If you use vgg_16 weights, set 'vgg_16'.
+finetune_from:
 # The parameter for tf.data.Dataset.shuffle().
 shuffle_buffer_size: 100
 # Path to the cityscapes tfrecord data directory.
