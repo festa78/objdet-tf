@@ -3,17 +3,17 @@
 # The batch size on training.
 batch_size: 10
 # The height of resized image for train.
-train_resized_height: 320
+train_resized_height: 448
 # The width of resized image for train.
-train_resized_width: 576
+train_resized_width: 448
 # The height of resized image for validation.
-val_resized_height: 320
+val_resized_height: 448
 # The width of resized image for validation.
-val_resized_width: 576
+val_resized_width: 448
 # The crop height size for random cropping in training.
-train_crop_height: 320
+train_crop_height: 448
 # The crop width size for random cropping in training.
-train_crop_width: 576
+train_crop_width: 448
 # The directory path to save logs and models.
 save_dir: "./tmp"
 # The number of epochs to train.
@@ -37,16 +37,16 @@ prefetch_buffer_size: 10
 # If true, random flip image horizontally.
 random_flip_left_right: true
 # Scale factor used to adjust brightness.
-random_brightness: 0.2
+random_brightness: 0.1
 # Scale factor used to adjust contrast.
-random_contrast: 0.2
+random_contrast: 0.1
 # Scale factor used to adjust hue.
-random_hue: 0.2
+random_hue: 0.1
 # Scale factor used to adjust saturation.
-random_saturation: 0.2
+random_saturation: 0.1
 # Parameters for tf.train.polynomial_decay.
-learning_rate: 0.002
-end_learning_rate: 0.0002
+learning_rate: 0.0002
+end_learning_rate: 0.00002
 power: 0.9
 # The number of training samples. Use to compute decay steps
 # for polynomial learning rate.

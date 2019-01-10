@@ -13,9 +13,10 @@ class YOLOV2(Common):
     cf. https://arxiv.org/abs/1612.08242
     """
     # The output feature map size.
+    # image_size = SCALE * (GRID_W, GRID_H).
     SCALE = 32
-    GRID_H = 10
-    GRID_W = 18
+    GRID_H = 14
+    GRID_W = 14
 
     def __init__(self, num_classes, num_anchors):
         super().__init__()

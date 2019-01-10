@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -B
-"""The script to train VOC2012 data by a fully convolutional network (aka FCN).
+"""The script to train VOC2012 data by YOLOV2.
 """
 
 import argparse
@@ -184,8 +184,10 @@ if __name__ == '__main__':
             options['batch_size'],
             end_learning_rate=options['end_learning_rate'],
             power=options['power'])
-        optimizer = tf.train.GradientDescentOptimizer(
+        optimizer = tf.train.AdamOptimizer(
             learning_rate=learning_rate)
+        # optimizer = tf.train.GradientDescentOptimizer(
+        #     learning_rate=learning_rate)
 
         trainer = Trainer(
             model=model,

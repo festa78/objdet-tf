@@ -51,6 +51,7 @@ def _parse_yolo_prediction_and_target(prediction, target):
     nonobjectness_prediction = -tf.log((1. - nonobjectness_sigmoid_prediction) /
                                        nonobjectness_sigmoid_prediction)
 
+    # Create logits expression.
     objectness_stack_prediction = tf.stack(
         [nonobjectness_prediction, objectness_prediction], axis=-1)
     objectness_prediction = tf.reshape(
@@ -58,13 +59,14 @@ def _parse_yolo_prediction_and_target(prediction, target):
     nonobjectness_prediction = tf.reshape(
         tf.boolean_mask(objectness_stack_prediction, background), shape=(-1, 2))
 
+    # Create onehot targets.
     nonobjectness_target = tf.boolean_mask(objectness_target, background)
     objectness_target = tf.boolean_mask(objectness_target, foreground)
-    objectness_onehot_target = tf.reshape(
-        tf.one_hot(tf.cast(objectness_target, tf.int32), depth=2),
-        shape=(-1, 2))
     nonobjectness_onehot_target = tf.reshape(
         tf.one_hot(tf.cast(nonobjectness_target, tf.int32), depth=2),
+        shape=(-1, 2))
+    objectness_onehot_target = tf.reshape(
+        tf.one_hot(tf.cast(objectness_target, tf.int32), depth=2),
         shape=(-1, 2))
 
     parsed_prediction = {
