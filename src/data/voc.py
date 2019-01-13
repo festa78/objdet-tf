@@ -1,3 +1,6 @@
+"""Dataset utils for VOC2007 dataset.
+"""
+
 from collections import namedtuple
 import os
 import xml.etree.ElementTree as ET

@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -B
-"""The script to train VOC2012 data by YOLOV2.
+"""The script to train VOC2007 data by YOLOV2.
 """
 
 import argparse
