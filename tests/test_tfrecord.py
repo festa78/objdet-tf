@@ -1,7 +1,6 @@
 """Test set for tfrecord writer and reader.
 """
 import os
-import unittest
 import xml.etree.ElementTree as ET
 
 from PIL import Image
@@ -102,7 +101,7 @@ def _create_sample_voc_structure(tmpdir):
     return root_dir_path, data_list
 
 
-class Test(unittest.TestCase):
+class Test(tf.test.TestCase):
 
     @pytest.fixture(autouse=True)
     def setup(self, tmpdir):
@@ -137,7 +136,7 @@ class Test(unittest.TestCase):
             dataset = read_tfrecord(
                 os.path.join(output_dir, category + '_0000.tfrecord'))
             next_element = dataset.make_one_shot_iterator().get_next()
-            with tf.Session() as sess:
+            with self.test_session() as sess:
                 # The op for initializing the variables.
                 sess.run(init_op)
                 i = 0
@@ -148,8 +147,8 @@ class Test(unittest.TestCase):
                             Image.open(open(sample['filename'].decode(),
                                             'rb')).convert('RGB'))
                         np.testing.assert_array_equal(sample['image'], gt_image)
-                        self.assertEquals(sample['height'], IMAGE_HEIGHT)
-                        self.assertEquals(sample['width'], IMAGE_WIDTH)
+                        self.assertEqual(sample['height'], IMAGE_HEIGHT)
+                        self.assertEqual(sample['width'], IMAGE_WIDTH)
                         np.testing.assert_array_almost_equal(
                             sample['label'], GT_LABEL[i])
                         i += 1

@@ -1,6 +1,5 @@
 """Test set for voc classes.
 """
-import unittest
 import xml.etree.ElementTree as ET
 
 from PIL import Image
@@ -100,7 +99,7 @@ def _create_sample_voc_structure(tmpdir):
     return root_dir_path, data_list
 
 
-class Test(unittest.TestCase):
+class Test(tf.test.TestCase):
 
     @pytest.fixture(autouse=True)
     def setup(self, tmpdir):
@@ -115,7 +114,7 @@ class Test(unittest.TestCase):
         for cat1, cat2 in zip(data_list.values(), gt_data_list.values()):
             for list1, list2 in zip(cat1.values(), cat2.values()):
                 # Do not care about orders.
-                self.assertEquals(set(list1), set(list2))
+                self.assertEqual(set(list1), set(list2))
 
     def test_parse_label_files(self):
         """Test it can properly parse the voc xml label format.
@@ -133,5 +132,5 @@ class Test(unittest.TestCase):
         train_labels = parse_label_files(data_list['train']['label_list'])
         val_labels = parse_label_files(data_list['val']['label_list'])
 
-        self.assertEquals(GT_LABEL, train_labels)
-        self.assertEquals(GT_LABEL[:-1], val_labels)
+        self.assertEqual(GT_LABEL, train_labels)
+        self.assertEqual(GT_LABEL[:-1], val_labels)

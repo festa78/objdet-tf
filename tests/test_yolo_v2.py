@@ -1,8 +1,6 @@
 """Test set for YOLOV2 classes.
 """
 
-import unittest
-
 import numpy as np
 import tensorflow as tf
 
@@ -12,7 +10,7 @@ from src.utils.detection_losses import yolo_detection_loss
 from src.models.yolo_v2 import YOLOV2
 
 
-class Test(unittest.TestCase):
+class Test(tf.test.TestCase):
     NUM_CLASSES = 3
     NUM_ANCHORS = 1
 
@@ -33,7 +31,7 @@ class Test(unittest.TestCase):
                         tf.float32, (None, image_height, image_width, 3))
                     dummy_gt = tf.placeholder(
                         tf.float32,
-                        (1, model.GRID_H, model.GRID_W, NUM_ANCHORS, 6))
+                        (1, model.GRID_H, model.GRID_W, self.NUM_ANCHORS, 6))
 
                 with tf.device("/gpu:0"):
                     dut = model(self.NUM_CLASSES, self.NUM_ANCHORS)
@@ -50,11 +48,11 @@ class Test(unittest.TestCase):
                         loss, var_list=tf.trainable_variables())
                     train_op = optimizer.apply_gradients(grads)
 
-                with tf.Session() as sess:
+                with self.test_session() as sess:
                     sess.run(tf.global_variables_initializer())
 
                     target_np = np.zeros((1, model.GRID_H, model.GRID_W,
-                                          NUM_ANCHORS, 6))
+                                          self.NUM_ANCHORS, 6))
                     target_np[0, 5, 5, 0, 4] = np.array([1.])
                     target_np[0, 5, 5, 0, 5:] = np.array([1.])
 

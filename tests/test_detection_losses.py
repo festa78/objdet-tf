@@ -3,14 +3,13 @@
 
 import numpy as np
 import tensorflow as tf
-import unittest
 
 import project_root
 
 from src.utils.detection_losses import yolo_detection_loss
 
 
-class Test(unittest.TestCase):
+class Test(tf.test.TestCase):
     GRID_SIZE = 10
     NUM_CLASSES = 3
 
@@ -25,7 +24,7 @@ class Test(unittest.TestCase):
             target = tf.placeholder(tf.float32,
                                     (1, self.GRID_SIZE, self.GRID_SIZE, 1, 6))
 
-            with tf.Session() as sess:
+            with self.test_session() as sess:
                 loss_all, reg_loss, obj_loss, nonobj_loss, cls_loss = yolo_detection_loss(
                     pred,
                     target,
